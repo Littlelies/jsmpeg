@@ -27,7 +27,7 @@ socketServer.connectionCount = 0;
 socketServer.on('connection', function(socket, upgradeReq) {
 	socketServer.connectionCount++;
 	console.log(
-		'New WebSocket Connection: ', 
+		'New WebSocket Connection on ' + socket.channel + ': ', 
 		(upgradeReq || socket.upgradeReq).socket.remoteAddress,
 		(upgradeReq || socket.upgradeReq).headers['user-agent'],
 		'('+socketServer.connectionCount+' total)'
@@ -39,10 +39,16 @@ socketServer.on('connection', function(socket, upgradeReq) {
 		);
 	});
 });
-socketServer.broadcast = function(data) {
+socketServer.shouldHandle = function(request) {
+	request.socket.channel = request.url.substr(1).split('/')[0];
+	return true;
+};
+socketServer.broadcast = function(id, data) {
 	socketServer.clients.forEach(function each(client) {
 		if (client.readyState === WebSocket.OPEN) {
-			client.send(data);
+			if(id == client._socket.channel) {
+				client.send(data);
+			}
 		}
 	});
 };
@@ -63,10 +69,10 @@ var streamServer = http.createServer( function(request, response) {
 	console.log(
 		'Stream Connected: ' + 
 		request.socket.remoteAddress + ':' +
-		request.socket.remotePort
+		request.socket.remotePort + ' on ' + params[1]
 	);
 	request.on('data', function(data){
-		socketServer.broadcast(data);
+		socketServer.broadcast(params[1], data);
 		if (request.socket.recording) {
 			request.socket.recording.write(data);
 		}
